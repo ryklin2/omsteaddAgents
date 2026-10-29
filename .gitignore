@@ -1,23 +1,63 @@
+# ---- Go ----
+# Compiled binaries and build output
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Test and coverage output
+*.test
+*.out
+coverage.*
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Dependency directory (only if vendoring is not committed)
 /vendor/
-node_modules/
-npm-debug.log
-yarn-error.log
 
-# Laravel 4 specific
-bootstrap/compiled.php
-app/storage/
-
-# Laravel 5 & Lumen specific
-public/storage
-public/hot
-
-# Laravel 5 & Lumen specific with changed public path
-public_html/storage
-public_html/hot
-
-storage/*.key
+# ---- Environment / secrets ----
 .env
-Homestead.yaml
-Homestead.json
-/.vagrant
-.phpunit.result.cache
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---- Postgres ----
+# Local data directory, dumps and logs
+pgdata/
+db/data/
+*.dump
+*.sql.gz
+*.backup
+pg_log/
+postgresql.log
+
+# ---- Frontend ----
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/.next/
+.cache/
+
+# ---- Editors / tooling ----
+.vscode/
+.idea/
+*.swp
+*~
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- Local overrides ----
+docker-compose.override.yml
+*.local
