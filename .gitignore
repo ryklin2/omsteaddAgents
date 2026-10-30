@@ -1,63 +1,34 @@
-# ---- Go ----
-# Compiled binaries and build output
+# If you prefer the allow list template instead of the deny list, see community template:
+# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
+#
+# Binaries for programs and plugins
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-bin/
-dist/
 
-# Test and coverage output
+# Test binary, built with `go test -c`
 *.test
+
+# Code coverage profiles and other test artifacts
 *.out
 coverage.*
+!coverage.go
+*.coverprofile
+profile.cov
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
 
 # Go workspace file
 go.work
 go.work.sum
 
-# Dependency directory (only if vendoring is not committed)
-/vendor/
-
-# ---- Environment / secrets ----
+# env file
 .env
-.env.*
-!.env.example
-*.pem
-*.key
 
-# ---- Postgres ----
-# Local data directory, dumps and logs
-pgdata/
-db/data/
-*.dump
-*.sql.gz
-*.backup
-pg_log/
-postgresql.log
-
-# ---- Frontend ----
-node_modules/
-npm-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-frontend/dist/
-frontend/build/
-frontend/.vite/
-frontend/.next/
-.cache/
-
-# ---- Editors / tooling ----
-.vscode/
-.idea/
-*.swp
-*~
-
-# ---- OS ----
-.DS_Store
-Thumbs.db
-
-# ---- Local overrides ----
-docker-compose.override.yml
-*.local
+# Editor/IDE
+# .idea/
+# .vscode/
+.yaml
