@@ -1,0 +1,25 @@
+body {
+  max-width: 40em;
+  margin: 3em auto;
+  padding: 0 1em;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+h1 {
+  margin-bottom: 0.25em;
+}
+
+ul {
+  margin-top: 2em;
+  padding: 0;
+  list-style: none;
+}
+
+li {
+  margin-bottom: 0.75em;
+}
+
+a {
+  color: #b4441f;
+}
