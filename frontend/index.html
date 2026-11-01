@@ -4,18 +4,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ryklin's Agents</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <h1>Ryklin's Agents</h1>
-  <p>A small collection of self-hosted tools.</p>
+  <header class="site-header">
+    <h1><a href="/" class="brand-link" data-nav>Ryklin's Agents</a></h1>
+    <p class="subtitle">A small collection of self-hosted tools.</p>
+    <p id="api-status" class="status-badge" aria-live="polite">Checking API health...</p>
+  </header>
 
-  <ul>
-    <li><a href="/mcdonalds-receipt-surveyer">McDonald's Receipt Surveyer</a></li>
-    <li><a href="/warcraftlogs-blame-me">Warcraftlogs Blame Me</a></li>
-    <li><a href="/git-repo-code-reviewer">Git Repo Code Reviewer</a></li>
-  </ul>
+  <main id="app-root">
+    <ul class="agent-list">
+      <li><a href="/mcdonalds-receipt-surveyer" data-nav>McDonald's Receipt Surveyer</a></li>
+      <li><a href="/warcraftlogs-blame-me" data-nav>Warcraftlogs Blame Me</a></li>
+      <li><a href="/git-repo-code-reviewer" data-nav>Git Repo Code Reviewer</a></li>
+    </ul>
+  </main>
 
-  <script src="app.js"></script>
+  <script type="module" src="/app.js"></script>
 </body>
 </html>

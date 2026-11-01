@@ -1,6 +1,6 @@
-# your-app
+# Ryklin's Agents (`omsteaddAgents`)
 
-> One-line description of what the app does.
+> A small collection of self-hosted agent tools (McDonald's Receipt Surveyer, Warcraftlogs Blame Me, and Git Repo Code Reviewer).
 
 A static frontend served by Cloudflare, a Go API on Google Cloud Run, and Postgres on Neon. At low traffic, all three stay within their providers' free tiers.
 
@@ -43,11 +43,13 @@ Only the API runs as a container in production. The frontend is static files on 
 .
 ├── frontend/                  # web app; production build lands in frontend/dist
 ├── backend/
+│   ├── agents/                # agent definitions and execution handlers
 │   ├── cmd/api/               # main package for the API server
 │   ├── migrations/            # SQL migrations, applied with goose
 │   └── Dockerfile
 ├── docker-compose.yml         # local Postgres + API
 └── docs/
+    ├── ARCHITECTURE_REVIEW_AND_CHECKLIST.md
     └── DEPLOYMENT_PLAN.md     # one-time setup for Cloudflare, Cloud Run, and Neon
 ```
 
