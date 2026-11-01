@@ -43,12 +43,14 @@ Only the API runs as a container in production. The frontend is static files on 
 .
 ├── frontend/                  # web app; production build lands in frontend/dist
 ├── backend/
-│   ├── agents/                # agent definitions and execution handlers
+│   ├── agents/                # agent definitions and ADK learning labs
+│   ├── cmd/adk-playground/    # standalone CLI playground for ADK Quickstart
 │   ├── cmd/api/               # main package for the API server
 │   ├── migrations/            # SQL migrations, applied with goose
 │   └── Dockerfile
 ├── docker-compose.yml         # local Postgres + API
 └── docs/
+    ├── ADK_LEARNING_GUIDE.md  # step-by-step Google ADK (Go) learning modules
     ├── ARCHITECTURE_REVIEW_AND_CHECKLIST.md
     └── DEPLOYMENT_PLAN.md     # one-time setup for Cloudflare, Cloud Run, and Neon
 ```
