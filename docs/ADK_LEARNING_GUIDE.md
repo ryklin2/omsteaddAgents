@@ -50,7 +50,20 @@ go mod tidy
 
 ### 3. Complete Your First Exercise in `backend/cmd/adk-playground/main.go`
 Open [`backend/cmd/adk-playground/main.go`](../backend/cmd/adk-playground/main.go). Follow the `TODO(learn)` comments to:
-1. Initialize `gemini.NewModel(ctx, "gemini-2.5-flash", &genai.ClientConfig{APIKey: ...})`
+1. Initialize `gemini.NewModel(ctx, "gemini-3.5-flash", &genai.ClientConfig{APIKey: ...})`
+
+   > **Model availability:** `gemini-2.5-flash` is retired for newly created API keys (it 404s with
+   > "no longer available to new users"). The newest Flash models (`gemini-3.8-flash`,
+   > `gemini-3.7-flash`, `gemini-flash-latest`) are frequently capacity-limited and return
+   > `503 UNAVAILABLE`. `gemini-3.5-flash` is the current reliable default. To see what your own key
+   > can reach:
+   >
+   > ```bash
+   > curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=$GOOGLE_API_KEY" \
+   >   | grep -o '"name": "models/[^"]*"'
+   > ```
+   >
+   > A listed model can still 404 or 503 — the list is not a guarantee of access.
 2. Create an `llmagent.New(llmagent.Config{...})`
 3. Run it from your terminal using ADK's built-in `full.NewLauncher()` (which gives you both a CLI chat loop and ADK's built-in local web debugger!).
 
