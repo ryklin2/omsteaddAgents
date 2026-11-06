@@ -34,9 +34,13 @@ type ParseReceiptCodeResult struct {
 	Valid            bool     `json:"valid"`
 }
 
+
+
 // TODO(learn - Step 1.2): Implement the tool handler function and wrap it with
 // `functiontool.New(functiontool.Config{Name: "parse_receipt_code", ...}, fn)`
 // once you add `google.golang.org/adk/tool/functiontool` to go.mod.
+
+
 
 // TODO(learn - Step 1.3): Define a second tool (e.g. `submit_mcdvoice_survey`)
 // that takes the parsed CN1..CN6 chunks and visit type, performs the HTTP
