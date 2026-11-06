@@ -21,6 +21,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/ryklin2/omsteaddAgents/backend/internal/envfile"
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
 	"google.golang.org/adk/cmd/launcher"
@@ -37,6 +38,14 @@ const modelName = "gemini-3.5-flash"
 
 func main() {
 	ctx := context.Background()
+
+	// Load backend/.env before reading any configuration. Shell variables
+	// already set take precedence over the file.
+	envResult, err := envfile.Load()
+	if err != nil {
+		log.Fatalf("failed to load .env: %v", err)
+	}
+	log.Printf("configuration: %s", envResult.Summary())
 
 	apiKey := os.Getenv("GOOGLE_API_KEY")
 	if apiKey == "" {

@@ -79,10 +79,64 @@ Open [`backend/cmd/adk-playground/main.go`](../backend/cmd/adk-playground/main.g
 3. **System Instructions (`Instruction`)**: Prompting the agent so it validates the receipt code first, calls your survey tool, and returns a clean validation code.
 
 **Your Checklist**:
-- [ ] **Step 1.1**: Define the `ParseReceiptCodeArgs` and `ParseReceiptCodeResult` structs with `json` and `jsonschema` tags.
-- [ ] **Step 1.2**: Implement `parseReceiptCodeTool` (`func(ctx tool.Context, args ParseReceiptCodeArgs) (ParseReceiptCodeResult, error)`) and wrap it with `functiontool.New`.
-- [ ] **Step 1.3**: Define a second tool (`submitMcDVoiceSurveyTool`) that walks through the survey request and returns the validation code.
-- [ ] **Step 1.4**: Wire both tools into `llmagent.New` and execute the agent with `runner.New`.
+- [x] **Step 1.1**: Define the `ParseReceiptCodeArgs` and `ParseReceiptCodeResult` structs with `json` and `jsonschema` tags.
+- [x] **Step 1.2**: Implement `parseReceiptCode` and wrap it with `functiontool.New`.
+- [x] **Step 1.3**: Define a second tool (`submit_mcdvoice_survey`) that walks through the survey and returns the validation code.
+- [x] **Step 1.4**: Wire both tools into `llmagent.New` and execute the agent with `runner.New`.
+
+### API corrections found while building this
+
+The handler signature in this guide was wrong. ADK v1.9.0 requires:
+
+```go
+func(agent.ToolContext, TArgs) (TResults, error)   // not tool.Context
+```
+
+`agent.ToolContext` embeds `context.Context` (through `agent.ReadonlyContext`), so it can be
+passed directly to `http.NewRequestWithContext` — no separate context parameter is needed, and
+cancelling the agent run cancels any in-flight tool I/O.
+
+Schema inference comes from `github.com/google/jsonschema-go`, where the `jsonschema:"..."` tag
+value becomes the property **description**. Two things that will bite you:
+
+- An **empty** `jsonschema:""` tag is a hard error, not a missing description.
+- Tag values may not begin with `WORD=`; that form is reserved.
+
+### Error channel: `error` vs. a result field
+
+A tool returning a non-nil `error` tells the model *the tool broke*, which usually triggers a retry
+or an abandoned run. That is the wrong channel for an expected outcome like "this code is only 8
+digits" — the model should explain that to the user, not retry it. So:
+
+| Situation | Channel |
+|---|---|
+| User's code is malformed | `Valid: false` + `Reason` on a successful return |
+| Model passed args that contradict a previous tool result | `error` |
+| Network/dependency failure | `error` |
+
+### Live vs. simulated submission
+
+`submit_mcdvoice_survey` has two modes, selected by `MCDVOICE_LIVE`:
+
+```bash
+# Simulation (default): no network call, deterministic placeholder code.
+go run ./cmd/api
+
+# Live: really completes the survey and returns the real validation code.
+export MCDVOICE_LIVE=1
+export MCDVOICE_RATING=5     # your standing satisfaction rating, 1-5
+export MCDVOICE_DEBUG=1      # dump each page's controls while iterating
+go run ./cmd/api
+```
+
+Live is opt-in because each run is irreversible and consumes the single use of a real receipt code
+— keep it off while developing the agent, or you will burn receipts on debugging.
+
+The entry form (`CN1`-`CN6`, `JavaScriptEnabled`, `FIP`, `AllowCapture`, `NextButton`) was read
+from the live site and is covered by a fixture test. The question pages after it have **not** been
+observed, so `answerPage` in `backend/agents/mcdvoice_live.go` walks them generically: it parses
+whatever form each page serves and picks radio options by matching label text against a
+most-positive-first keyword list. Expect to tune it once you have a real transcript.
 
 ---
 

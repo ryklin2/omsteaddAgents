@@ -20,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/cors"
 	"github.com/ryklin2/omsteaddAgents/backend/agents"
+	"github.com/ryklin2/omsteaddAgents/backend/internal/envfile"
 )
 
 type agentRunRecord struct {
@@ -73,6 +74,16 @@ func (m *memoryStore) getByID(slug, id string) (agentRunRecord, bool) {
 func main() {
 	logger := newCloudLogger()
 	slog.SetDefault(logger)
+
+	// Must run before anything reads configuration. A malformed .env is fatal
+	// rather than ignored: silently starting with half the configuration
+	// applied is worse than refusing to start.
+	envResult, err := envfile.Load()
+	if err != nil {
+		logger.Error("failed to load .env", "error", err)
+		os.Exit(1)
+	}
+	logger.Info("configuration", "env", envResult.Summary())
 
 	port := os.Getenv("PORT")
 	if port == "" {
