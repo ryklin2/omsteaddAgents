@@ -100,8 +100,36 @@ func main() {
 			logger.Error("failed to parse DATABASE_URL", "error", err)
 			os.Exit(1)
 		}
-		// Cap pool size per Cloud Run instance to protect Lakebase/Neon connection limits.
-		cfg.MaxConns = 5
+		// Tune for serverless Postgres that scales to zero (Neon/Lakebase).
+		//
+		// Each value is applied only when DATABASE_URL did not already specify
+		// it, so the connection string stays authoritative. pgxpool.ParseConfig
+		// fills unspecified fields with its own defaults, which are
+		// indistinguishable from a deliberate choice — hence the string check
+		// rather than comparing against the default value.
+		if !strings.Contains(dbURL, "pool_max_conns") {
+			// Caps connections per instance. Several Cloud Run instances share
+			// one Neon project's connection budget.
+			cfg.MaxConns = 5
+		}
+		if !strings.Contains(dbURL, "pool_max_conn_idle_time") {
+			// Neon suspends an idle compute (5 minutes by default) and
+			// terminates its connections. pgxpool's default idle time is 30
+			// minutes, so without this the pool keeps handles that the server
+			// has already closed, and the next request pays a failed round trip
+			// before getting a working connection. Reaping first is cheaper.
+			cfg.MaxConnIdleTime = 2 * time.Minute
+		}
+		if !strings.Contains(dbURL, "pool_health_check_period") {
+			cfg.HealthCheckPeriod = 30 * time.Second
+		}
+		if cfg.ConnConfig.ConnectTimeout == 0 {
+			// A cold start that wakes both Cloud Run and a suspended Neon
+			// compute can take 500-1000 ms; pgx defaults to no timeout at all,
+			// which turns an unreachable database into a hung request.
+			cfg.ConnConfig.ConnectTimeout = 10 * time.Second
+		}
+
 		pool, err = pgxpool.NewWithConfig(ctx, cfg)
 		if err != nil {
 			logger.Error("failed to initialize database pool", "error", err)
