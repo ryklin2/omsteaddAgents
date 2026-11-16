@@ -96,8 +96,11 @@ a {
   margin-bottom: 0.35em;
 }
 
-.form-field input {
+.form-field input,
+.form-field select,
+.form-field textarea {
   width: 100%;
+  font-family: inherit;
   box-sizing: border-box;
   padding: 0.5em 0.65em;
   font-size: 1rem;
@@ -167,4 +170,36 @@ pre {
 
 .muted {
   color: #57606a;
+}
+
+.validation-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+  margin: 1em 0;
+  padding: 1em;
+  border: 2px solid #4ac26b;
+  border-radius: 6px;
+  background: #dafbe1;
+}
+
+.validation-card[data-mode="simulation"] {
+  border-color: #d4a72c;
+  background: #fff8c5;
+}
+
+.validation-label {
+  font-weight: 600;
+}
+
+.validation-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 2rem;
+  letter-spacing: 0.1em;
+}
+
+.notice {
+  padding: 0.5em 0.75em;
+  border-left: 3px solid #d4a72c;
+  background: #f6f8fa;
 }

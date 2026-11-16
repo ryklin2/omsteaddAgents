@@ -174,6 +174,15 @@ A Neon project's region can't be changed after it's created, so choose deliberat
     --role roles/secretmanager.secretAccessor
   ```
 
+- [ ] Store the Gemini API key the agents call the model with, the same way. Without it every agent run fails with `GOOGLE_API_KEY is not set`, even though `/health` passes.
+
+  ```bash
+  printf '%s' 'your-gemini-api-key' | gcloud secrets create GOOGLE_API_KEY --data-file=-
+  gcloud secrets add-iam-policy-binding GOOGLE_API_KEY \
+    --member "serviceAccount:api-runtime@PROJECT_ID.iam.gserviceaccount.com" \
+    --role roles/secretmanager.secretAccessor
+  ```
+
 - [ ] Deploy from the repository root:
 
   ```bash
@@ -181,14 +190,19 @@ A Neon project's region can't be changed after it's created, so choose deliberat
     --source ./backend \
     --region us-west1 \
     --service-account api-runtime@PROJECT_ID.iam.gserviceaccount.com \
-    --set-secrets DATABASE_URL=DATABASE_URL:latest \
-    --set-env-vars CORS_ALLOWED_ORIGINS=http://localhost:5173 \
+    --set-secrets DATABASE_URL=DATABASE_URL:latest,GOOGLE_API_KEY=GOOGLE_API_KEY:latest \
+    --set-env-vars CORS_ALLOWED_ORIGINS=http://localhost:5173,MCDVOICE_LIVE=0,MCDVOICE_RATING=5 \
+    --timeout 900 \
     --allow-unauthenticated \
     --min-instances 0 \
     --max-instances 3
   ```
 
   What the flags do: `--source` uploads `backend/`, builds it with Cloud Build using your Dockerfile, and stores the image in Artifact Registry (the first deploy offers to create a repository for this; accept it). `--allow-unauthenticated` makes the API publicly reachable, since your app handles its own auth. `--min-instances 0` lets the service scale to zero, which keeps it free while idle at the cost of cold starts. `--max-instances 3` caps both your bill and your database connection count during a traffic spike. The CORS origin is a placeholder until the frontend exists in Phase 4.
+
+  `--timeout 900` matters for the agents: a run is several sequential Gemini calls, and a McDonald's run measured 2.5–4 minutes end to end on the free tier, before any live survey walk. Cloud Run's default 300-second timeout would cut those off. `MCDVOICE_RATING=5` is the positive default each survey submits when the request doesn't pick a rating. Leave `MCDVOICE_LIVE=0` for the first deploy: in simulation mode nothing is sent to mcdvoice.com. Once the deployed flow looks right, switch on real submissions with `gcloud run services update api --region us-west1 --update-env-vars MCDVOICE_LIVE=1`.
+
+  With `--allow-unauthenticated` and `MCDVOICE_LIVE=1`, anyone who finds the URL can spend your Gemini quota and submit surveys through it. Keep `--max-instances` low, and add auth before you share the URL.
 
 - [ ] Verify:
 
@@ -286,7 +300,14 @@ Optional: on pull requests, create a Neon branch (Neon publishes GitHub Actions 
 - [ ] Budget alert in place (Phase 0).
 - [ ] `--max-instances` set on the service (Phase 3).
 - [ ] Keep `--min-instances 0` unless cold starts genuinely hurt, because an always-on instance is billed around the clock.
-- [ ] Add a cleanup policy to the `cloud-run-source-deploy` repository in Artifact Registry so old images get deleted. Keeping the five most recent is plenty for rollbacks. Every source deploy adds an image, and storage beyond the free allowance is billed.
+- [ ] Add a cleanup policy to the `cloud-run-source-deploy` repository in Artifact Registry so old images get deleted. Keeping the five most recent is plenty for rollbacks. Every source deploy adds an image, and storage beyond the free allowance is billed. The policy is in [`deploy/artifact-registry-cleanup.json`](../deploy/artifact-registry-cleanup.json). Do a dry run first, then apply it:
+
+  ```bash
+  gcloud artifacts repositories set-cleanup-policies cloud-run-source-deploy \
+    --location us-west1 --policy deploy/artifact-registry-cleanup.json --dry-run
+  gcloud artifacts repositories set-cleanup-policies cloud-run-source-deploy \
+    --location us-west1 --policy deploy/artifact-registry-cleanup.json --no-dry-run
+  ```
 - [ ] Log JSON to stdout. Cloud Logging reads `severity` and `message` fields, so use `ReplaceAttr` to map Go `slog`'s `level` and `msg` keys to those names (and `WARN` to `WARNING`). Your logs then become filterable by severity in the console.
 - [ ] Check Neon's usage page now and then. The free plan caps storage and compute, and the console shows how close you are.
 

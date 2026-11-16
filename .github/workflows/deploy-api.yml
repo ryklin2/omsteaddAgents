@@ -1,0 +1,100 @@
+# TASK-14 / Phase 6: deploy the Go API to Cloud Run on every push to main that
+# touches backend/.
+#
+# Inert until configured: every job is skipped while the GCP_PROJECT_ID
+# repository variable is unset, so merging this does not produce red runs.
+#
+# Setup (once), see docs/DEPLOYMENT_PLAN.md Phase 6:
+#   Repository variables (Settings -> Secrets and variables -> Actions -> Variables):
+#     GCP_PROJECT_ID   your project ID
+#     GCP_REGION       e.g. us-west1
+#     GCP_WIF_PROVIDER projects/NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER
+#     GCP_DEPLOY_SA    the service account GitHub impersonates to deploy
+#   Repository secrets:
+#     NEON_DIRECT_URL  the DIRECT (non-pooler) Neon connection string, for migrations
+#
+# Authentication uses Workload Identity Federation, so no service account key is
+# stored in GitHub.
+name: Deploy API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  test:
+    if: vars.GCP_PROJECT_ID != ''
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - run: go vet ./...
+      - run: go test ./...
+
+  deploy:
+    needs: test
+    if: vars.GCP_PROJECT_ID != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for Workload Identity Federation
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      # Migrations run BEFORE the new code goes live, so each one must keep the
+      # currently serving revision working (see "Database migrations" in README).
+      - name: Apply migrations
+        env:
+          NEON_DIRECT_URL: ${{ secrets.NEON_DIRECT_URL }}
+        run: |
+          if [ -z "$NEON_DIRECT_URL" ]; then
+            echo "NEON_DIRECT_URL is not set; skipping migrations"
+            exit 0
+          fi
+          go install github.com/pressly/goose/v3/cmd/goose@v3.26.0
+          goose -dir backend/migrations postgres "$NEON_DIRECT_URL" up
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # Service settings from the first manual deploy (service account, secrets,
+      # env vars, timeout, instance limits) carry over to new revisions, so only
+      # the source is sent here.
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy api \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "${{ vars.GCP_REGION || 'us-west1' }}" \
+            --source ./backend \
+            --quiet
+
+      - name: Smoke test
+        run: |
+          URL=$(gcloud run services describe api \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "${{ vars.GCP_REGION || 'us-west1' }}" \
+            --format 'value(status.url)')
+          curl -fsS --retry 3 --retry-delay 5 "$URL/health"

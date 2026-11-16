@@ -91,6 +91,11 @@ To wipe the local database and start fresh, run `docker compose down -v`.
 | `PORT` | API | `8080` | Set by Cloud Run; the server must listen on it |
 | `CORS_ALLOWED_ORIGINS` | API | `http://localhost:5173` | `https://app.example.com` |
 | `VITE_API_URL` | Frontend build | `http://localhost:8080` | `https://api.example.com` |
+| `GOOGLE_API_KEY` | API (agents) | `backend/.env` | Injected from Secret Manager |
+| `MCDVOICE_RATING` | API (McDonald's agent) | Unset (defaults to `5`) | `5` |
+| `MCDVOICE_LIVE` | API (McDonald's agent) | `0` (simulated) | `0` until verified, then `1` |
+
+The McDonald's Receipt Surveyer submits positive feedback by default. The form comes pre-set to 5 (Highly Satisfied), and a request that leaves out `rating` uses `MCDVOICE_RATING`, which also defaults to 5. Choose a lower rating in the form when a visit was worse. The comment box is optional and is submitted verbatim; the agent never writes one itself. Real submissions happen only with `MCDVOICE_LIVE=1`, because each one uses up the receipt code.
 
 Frontend variables are compiled into the JavaScript bundle, so anyone can read them. Never put secrets there. `VITE_` is Vite's naming prefix; if you use a different framework, rename it to match (Next.js uses `NEXT_PUBLIC_`, for example).
 

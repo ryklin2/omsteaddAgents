@@ -12,6 +12,7 @@ import (
 	"google.golang.org/adk/agent/llmagent"
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
+	"google.golang.org/genai"
 )
 
 // =============================================================================
@@ -317,7 +318,32 @@ func buildMcDonaldsAgent(ctx context.Context) (agent.Agent, error) {
 		Description: "Validates McDonald's receipt survey codes and walks the McDVoice survey flow.",
 		Instruction: mcDonaldsInstruction,
 		Tools:       []tool.Tool{parseTool, submitTool},
+		// The procedure is fixed (parse, then submit), so deep reasoning buys
+		// nothing and each model turn costs latency. Low thinking keeps a run
+		// well inside Cloud Run's request timeout.
+		GenerateContentConfig: &genai.GenerateContentConfig{
+			ThinkingConfig: &genai.ThinkingConfig{ThinkingLevel: genai.ThinkingLevelLow},
+		},
 	})
+}
+
+// requestedRating resolves the satisfaction rating for one run.
+//
+// The rating comes from the request or configuration, never from the model.
+// MCDVOICE_RATING is the user's standing satisfaction (5, the most positive, if
+// unset); a per-request "rating" field overrides it. A rating that is present
+// but malformed is rejected rather than silently replaced by the default:
+// submitting a 5 when the user asked for "2.5" would misreport their visit.
+func requestedRating(input map[string]any) (int, error) {
+	r := stringField(input, "rating")
+	if r == "" {
+		return standingRating(), nil
+	}
+	n, err := strconv.Atoi(r)
+	if err != nil || n < 1 || n > 5 {
+		return 0, fmt.Errorf("%w: rating must be a whole number from 1 to 5, got %q", ErrInvalidInput, r)
+	}
+	return n, nil
 }
 
 // RunMcDonaldsAgent is called by POST /api/agents/mcdonalds-receipt-surveyer/run.
@@ -343,14 +369,9 @@ func RunMcDonaldsAgent(ctx context.Context, input map[string]any) (map[string]an
 		return nil, err
 	}
 
-	// The rating comes from configuration, not from the model. MCDVOICE_RATING
-	// is the user's standing satisfaction; a per-request "rating" field
-	// overrides it.
-	rating := standingRating()
-	if r := stringField(input, "rating"); r != "" {
-		if n, err := strconv.Atoi(r); err == nil && n >= 1 && n <= 5 {
-			rating = n
-		}
+	rating, err := requestedRating(input)
+	if err != nil {
+		return nil, err
 	}
 
 	prompt := fmt.Sprintf(

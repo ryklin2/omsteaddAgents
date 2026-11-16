@@ -14,9 +14,33 @@ const AGENTS = {
       },
       {
         name: "visit_type",
-        label: "Visit Type (Drive-Thru / Dine-In / Carry-Out)",
-        placeholder: "Drive-Thru",
-        required: false,
+        label: "Visit Type",
+        type: "select",
+        default: "Drive-Thru",
+        options: [
+          { value: "Drive-Thru", label: "Drive-Thru" },
+          { value: "Dine-In", label: "Dine-In" },
+          { value: "Carry-Out", label: "Carry-Out" },
+        ],
+      },
+      {
+        name: "rating",
+        label: "Overall Satisfaction",
+        type: "select",
+        default: "5",
+        options: [
+          { value: "5", label: "5 - Highly Satisfied" },
+          { value: "4", label: "4 - Satisfied" },
+          { value: "3", label: "3 - Neither" },
+          { value: "2", label: "2 - Dissatisfied" },
+          { value: "1", label: "1 - Highly Dissatisfied" },
+        ],
+      },
+      {
+        name: "comment",
+        label: "Comment (optional, submitted verbatim)",
+        placeholder: "Friendly crew and my order was hot and correct.",
+        type: "textarea",
       },
     ],
   },
@@ -59,6 +83,86 @@ const AGENTS = {
     ],
   },
 };
+
+// The API's catalog (GET /api/agents) is the source of truth for each agent's
+// form, so a field added in backend/agents/agents.go shows up here without a
+// frontend change. AGENTS above is the fallback for when the API is down.
+async function loadCatalog() {
+  try {
+    // Bounded, because the page waits on this before its first render and a
+    // cold Cloud Run start can take seconds; past that, the fallback is used.
+    const res = await fetch(`${API_URL}/api/agents`, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    for (const a of data.agents || []) {
+      AGENTS[a.slug] = {
+        name: a.name,
+        description: a.description,
+        fields: a.fields || [],
+      };
+    }
+  } catch {
+    // Keep the built-in catalog; checkApiHealth reports the outage.
+  }
+}
+
+function renderField(field) {
+  const id = `field-${escapeHtml(field.name)}`;
+  const name = escapeHtml(field.name);
+  const required = field.required ? "required" : "";
+  const def = field.default ?? "";
+  let input;
+  if (field.type === "select") {
+    input = `
+      <select id="${id}" name="${name}" ${required}>
+        ${(field.options || [])
+          .map(
+            (o) => `<option value="${escapeHtml(o.value)}" ${o.value === def ? "selected" : ""}>${escapeHtml(o.label)}</option>`
+          )
+          .join("")}
+      </select>`;
+  } else if (field.type === "textarea") {
+    input = `<textarea id="${id}" name="${name}" rows="3" placeholder="${escapeHtml(field.placeholder)}" ${required}>${escapeHtml(def)}</textarea>`;
+  } else {
+    input = `<input id="${id}" name="${name}" type="text" value="${escapeHtml(def)}" placeholder="${escapeHtml(field.placeholder)}" ${required} />`;
+  }
+  return `
+    <div class="form-field">
+      <label for="${id}">${escapeHtml(field.label)}</label>
+      ${input}
+    </div>`;
+}
+
+// renderResult shows the facts a run produced up front. For the McDonald's
+// agent that is the validation code and whether it is real or simulated; the
+// full payload stays available underneath for debugging.
+function renderResult(data) {
+  const out = data.output_payload || {};
+  let headline = "";
+  if (out.validation_code) {
+    headline = `
+      <div class="validation-card" data-mode="${escapeHtml(out.mode)}">
+        <span class="validation-label">Validation code${out.mode === "simulation" ? " (simulated)" : ""}</span>
+        <span class="validation-code">${escapeHtml(out.validation_code)}</span>
+        <span class="muted">Submitted as ${escapeHtml(out.rating)}/5, ${escapeHtml(out.visit_type)}</span>
+      </div>`;
+  } else if (out.invalid_reason) {
+    headline = `<p class="error-text">${escapeHtml(out.invalid_reason)}</p>`;
+  }
+  const notice = out.notice ? `<p class="notice">${escapeHtml(out.notice)}</p>` : "";
+  const summary = out.summary ? `<p>${escapeHtml(out.summary)}</p>` : "";
+  const error = data.error_message ? `<p class="error-text">${escapeHtml(data.error_message)}</p>` : "";
+  return `
+    <strong>Run ${escapeHtml(data.status)}</strong> (ID: <code>${escapeHtml(data.id)}</code>)
+    ${headline}${notice}${error}${summary}
+    <details><summary>Full output</summary>
+      <pre>${escapeHtml(JSON.stringify(out, null, 2))}</pre>
+    </details>
+  `;
+}
 
 async function checkApiHealth() {
   const statusEl = document.getElementById("api-status");
@@ -116,21 +220,7 @@ async function renderAgentTool(root, slug) {
       <p>${escapeHtml(meta.description)}</p>
 
       <form id="agent-form" class="agent-form">
-        ${meta.fields
-          .map(
-            (field) => `
-          <div class="form-field">
-            <label for="field-${escapeHtml(field.name)}">${escapeHtml(field.label)}</label>
-            <input
-              id="field-${escapeHtml(field.name)}"
-              name="${escapeHtml(field.name)}"
-              type="text"
-              placeholder="${escapeHtml(field.placeholder)}"
-              ${field.required ? "required" : ""}
-            />
-          </div>`
-          )
-          .join("")}
+        ${meta.fields.map(renderField).join("")}
         <button type="submit" id="submit-btn">Run Agent</button>
       </form>
 
@@ -170,10 +260,7 @@ async function renderAgentTool(root, slug) {
       if (!res.ok) {
         throw new Error(data.error || `HTTP ${res.status}`);
       }
-      outputEl.innerHTML = `
-        <strong>Run ${escapeHtml(data.status)}</strong> (ID: <code>${escapeHtml(data.id)}</code>)
-        <pre>${escapeHtml(JSON.stringify(data.output_payload, null, 2))}</pre>
-      `;
+      outputEl.innerHTML = renderResult(data);
       await loadRecentRuns(slug);
     } catch (err) {
       outputEl.innerHTML = `<span class="error-text">Error: ${escapeHtml(err.message)}</span>`;
@@ -255,4 +342,4 @@ document.addEventListener("click", (e) => {
 window.addEventListener("popstate", handleRoute);
 
 checkApiHealth();
-handleRoute();
+loadCatalog().then(handleRoute);

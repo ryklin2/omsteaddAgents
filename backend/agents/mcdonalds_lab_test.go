@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"errors"
 	"net/url"
 	"os"
 	"strings"
@@ -217,6 +218,70 @@ func TestStandingRating(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRequestedRating(t *testing.T) {
+	t.Setenv("MCDVOICE_RATING", "")
+	_ = os.Unsetenv("MCDVOICE_RATING")
+
+	ok := []struct {
+		input map[string]any
+		want  int
+	}{
+		{map[string]any{}, 5},                // positive by default
+		{map[string]any{"rating": ""}, 5},    // untouched form field
+		{map[string]any{"rating": "3"}, 3},   // string from the form
+		{map[string]any{"rating": 4.0}, 4},   // JSON number
+		{map[string]any{"rating": " 2 "}, 2}, // whitespace tolerated
+	}
+	for _, tc := range ok {
+		got, err := requestedRating(tc.input)
+		if err != nil || got != tc.want {
+			t.Errorf("requestedRating(%v) = %d, %v; want %d, nil", tc.input, got, err, tc.want)
+		}
+	}
+
+	for _, bad := range []any{"0", "6", "2.5", "five", -1} {
+		_, err := requestedRating(map[string]any{"rating": bad})
+		if !errors.Is(err, ErrInvalidInput) {
+			t.Errorf("requestedRating(rating=%v) error = %v, want ErrInvalidInput", bad, err)
+		}
+	}
+}
+
+func TestRequestedRatingFollowsStandingRating(t *testing.T) {
+	t.Setenv("MCDVOICE_RATING", "4")
+	if got, err := requestedRating(map[string]any{}); err != nil || got != 4 {
+		t.Errorf("requestedRating with MCDVOICE_RATING=4 = %d, %v; want 4, nil", got, err)
+	}
+}
+
+// The catalog is what the frontend renders, so the positive default has to be
+// there, not only in the backend fallback.
+func TestCatalogDefaultsToPositiveRating(t *testing.T) {
+	meta, ok := Get("mcdonalds-receipt-surveyer")
+	if !ok {
+		t.Fatal("mcdonalds-receipt-surveyer not in catalog")
+	}
+	for _, f := range meta.Fields {
+		if f.Name != "rating" {
+			continue
+		}
+		if f.Default != "5" {
+			t.Errorf("rating default = %q, want %q", f.Default, "5")
+		}
+		found := false
+		for _, o := range f.Options {
+			if o.Value == f.Default {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("rating default %q is not one of its options", f.Default)
+		}
+		return
+	}
+	t.Error("mcdonalds-receipt-surveyer has no rating field")
 }
 
 func TestLiveEnabled(t *testing.T) {
